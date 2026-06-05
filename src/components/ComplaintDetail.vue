@@ -5,16 +5,55 @@ import {
   Search,
   AlertTriangle,
   Volume2,
+  VolumeX,
   CheckCircle2,
   Loader2,
-  MessageSquare,
   X,
+  Pause,
+  Play,
+  Mic,
 } from 'lucide-vue-next'
 import type { ComplaintStatus } from '@/types'
 
 const store = useNightMarketStore()
 const searchQuery = ref('')
 const filterStatus = ref<ComplaintStatus | ''>('')
+
+const playingRecordingId = ref<string | null>(null)
+const recordingProgress = ref<Record<string, number>>({})
+
+function toggleRecording(complaintId: string) {
+  if (playingRecordingId.value === complaintId) {
+    playingRecordingId.value = null
+    return
+  }
+  playingRecordingId.value = complaintId
+  if (!(complaintId in recordingProgress.value)) {
+    recordingProgress.value[complaintId] = 0
+  }
+  simulateProgress(complaintId)
+}
+
+function simulateProgress(complaintId: string) {
+  const step = () => {
+    if (playingRecordingId.value !== complaintId) return
+    const current = recordingProgress.value[complaintId] || 0
+    if (current >= 100) {
+      recordingProgress.value[complaintId] = 0
+      playingRecordingId.value = null
+      return
+    }
+    recordingProgress.value[complaintId] = current + 2
+    setTimeout(step, 200)
+  }
+  setTimeout(step, 200)
+}
+
+function formatDuration(seconds: number) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
 
 const filteredComplaints = computed(() => {
   return store.complaints
@@ -88,6 +127,7 @@ function getStallName(stallId: string) {
             <tr class="bg-night-800 text-night-400">
               <th class="text-left px-3 py-2 font-medium">摊位</th>
               <th class="text-left px-3 py-2 font-medium">投诉内容</th>
+              <th class="text-left px-3 py-2 font-medium">录音</th>
               <th class="text-left px-3 py-2 font-medium">重复</th>
               <th class="text-left px-3 py-2 font-medium">状态</th>
               <th class="text-left px-3 py-2 font-medium">时间</th>
@@ -108,7 +148,14 @@ function getStallName(stallId: string) {
               @click="store.selectComplaint(c.id)"
             >
               <td class="px-3 py-2 text-night-200">{{ getStallName(c.stallId) }}</td>
-              <td class="px-3 py-2 text-night-300 max-w-[300px] truncate">{{ c.content }}</td>
+              <td class="px-3 py-2 text-night-300 max-w-[250px] truncate">{{ c.content }}</td>
+              <td class="px-3 py-2">
+                <span v-if="c.recordingUrl" class="flex items-center gap-1 text-blue-400">
+                  <Mic class="w-3 h-3" />
+                  {{ formatDuration(c.recordingDuration) }}
+                </span>
+                <span v-else class="text-night-500">无</span>
+              </td>
               <td class="px-3 py-2">
                 <span
                   v-if="c.repeatCount >= 2"
@@ -153,7 +200,7 @@ function getStallName(stallId: string) {
 
     <div
       v-if="selectedComplaint"
-      class="w-[380px] flex flex-col bg-night-800 border-l border-night-700 ml-3"
+      class="w-[400px] flex flex-col bg-night-800 border-l border-night-700 ml-3"
     >
       <div class="flex items-center justify-between px-4 py-3 border-b border-night-700">
         <h3 class="text-sm font-semibold text-night-200">投诉详情</h3>
@@ -207,20 +254,83 @@ function getStallName(stallId: string) {
           </p>
         </div>
 
-        <div v-if="selectedComplaint.recordingUrl" class="border-t border-night-700 pt-3">
+        <div
+          v-if="selectedComplaint.recordingUrl"
+          class="border-t border-night-700 pt-3"
+        >
           <div class="flex items-center gap-1.5 mb-2">
-            <Volume2 class="w-3.5 h-3.5 text-blue-400" />
-            <span class="text-xs text-night-400">投诉录音</span>
+            <Mic class="w-3.5 h-3.5 text-blue-400" />
+            <span class="text-xs text-night-300 font-medium">投诉录音</span>
           </div>
-          <div class="bg-night-700/50 p-3 rounded-md flex items-center gap-2">
-            <button class="p-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white transition-colors">
-              <Volume2 class="w-3.5 h-3.5" />
-            </button>
-            <div class="flex-1 h-1 bg-night-600 rounded-full">
-              <div class="h-1 bg-blue-500 rounded-full w-0"></div>
+          <div v-if="selectedComplaint.recordingCaller" class="flex items-center gap-1.5 mb-2">
+            <span class="text-[10px] text-night-500">来电人：</span>
+            <span class="text-[10px] text-night-300">{{ selectedComplaint.recordingCaller }}</span>
+          </div>
+          <div class="bg-night-700/50 p-3 rounded-md">
+            <div class="flex items-center gap-3">
+              <button
+                @click="toggleRecording(selectedComplaint.id)"
+                :class="[
+                  'p-2 rounded-full transition-colors shrink-0',
+                  playingRecordingId === selectedComplaint.id
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white',
+                ]"
+              >
+                <Pause v-if="playingRecordingId === selectedComplaint.id" class="w-4 h-4" />
+                <Play v-else class="w-4 h-4" />
+              </button>
+              <div class="flex-1 min-w-0">
+                <div class="h-1.5 bg-night-600 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-blue-500 rounded-full transition-all duration-200"
+                    :style="{ width: (recordingProgress[selectedComplaint.id] || 0) + '%' }"
+                  ></div>
+                </div>
+                <div class="flex items-center justify-between mt-1">
+                  <span class="text-[10px] text-night-400">
+                    {{
+                      formatDuration(
+                        Math.floor(
+                          ((recordingProgress[selectedComplaint.id] || 0) / 100) *
+                          selectedComplaint.recordingDuration,
+                        ),
+                      )
+                    }}
+                  </span>
+                  <span class="text-[10px] text-night-500">
+                    {{ formatDuration(selectedComplaint.recordingDuration) }}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span class="text-[10px] text-night-500">0:00</span>
+            <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-night-600/50">
+              <Volume2 class="w-3 h-3 text-night-500" />
+              <div class="flex gap-px">
+                <div
+                  v-for="i in 20"
+                  :key="i"
+                  :class="[
+                    'w-1 rounded-full transition-all',
+                    playingRecordingId === selectedComplaint.id
+                      ? i % 3 === 0 ? 'h-2 bg-blue-400' : i % 2 === 0 ? 'h-3 bg-blue-400' : 'h-1.5 bg-blue-400/60'
+                      : 'h-1 bg-night-500',
+                  ]"
+                ></div>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div
+          v-else
+          class="border-t border-night-700 pt-3"
+        >
+          <div class="flex items-center gap-1.5 mb-1">
+            <VolumeX class="w-3.5 h-3.5 text-night-500" />
+            <span class="text-xs text-night-500">暂无录音</span>
+          </div>
+          <p class="text-[10px] text-night-600">该投诉为文字投诉，未附带录音材料</p>
         </div>
 
         <div

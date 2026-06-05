@@ -4,11 +4,12 @@ import { useNightMarketStore } from '@/stores/nightMarket'
 import {
   ArrowLeftRight,
   CheckCircle2,
-  Clock,
   Loader2,
-  AlertTriangle,
   TrendingUp,
   Camera,
+  ZoomIn,
+  X,
+  ImageIcon,
 } from 'lucide-vue-next'
 import { Line } from 'vue-chartjs'
 import {
@@ -28,6 +29,8 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const store = useNightMarketStore()
 const selectedStallId = ref('')
 const showChart = ref(false)
+const lightboxUrl = ref('')
+const lightboxLabel = ref('')
 
 const stallOptions = computed(() =>
   store.stalls.filter((s) => {
@@ -121,6 +124,16 @@ function rectStatusBadge(status: string) {
   return map[status] || { text: status, cls: 'bg-night-600 text-night-400 border-night-600' }
 }
 
+function openLightbox(url: string, label: string) {
+  lightboxUrl.value = url
+  lightboxLabel.value = label
+}
+
+function closeLightbox() {
+  lightboxUrl.value = ''
+  lightboxLabel.value = ''
+}
+
 watch(selectedStallId, () => {
   showChart.value = false
   setTimeout(() => {
@@ -130,8 +143,8 @@ watch(selectedStallId, () => {
 </script>
 
 <template>
-  <div class="flex h-full gap-4">
-    <div class="w-[280px] flex flex-col shrink-0">
+  <div class="flex h-full gap-4 relative">
+    <div class="w-[320px] flex flex-col shrink-0">
       <div class="bg-night-800 rounded-lg border border-night-700 p-4 mb-3">
         <label class="block text-xs text-night-400 mb-1.5">选择摊位</label>
         <select
@@ -145,7 +158,7 @@ watch(selectedStallId, () => {
         </select>
       </div>
 
-      <div v-if="selectedStallId" class="flex-1 overflow-y-auto space-y-2">
+      <div v-if="selectedStallId" class="flex-1 overflow-y-auto space-y-3">
         <h4 class="text-xs font-medium text-night-300 px-1 mb-2">整改记录</h4>
         <div
           v-for="r in stallRectifications"
@@ -158,30 +171,71 @@ watch(selectedStallId, () => {
             </span>
             <span class="text-[10px] text-night-500">{{ r.createdAt }}</span>
           </div>
-          <p class="text-[11px] text-night-300 leading-relaxed mb-2">{{ r.description }}</p>
+          <p class="text-[11px] text-night-300 leading-relaxed mb-3">{{ r.description }}</p>
 
-          <div class="border-t border-night-700 pt-2 space-y-2">
-            <div>
-              <span class="text-[10px] text-night-500 block mb-1">整改前</span>
-              <div class="bg-night-700/50 rounded-md h-20 flex items-center justify-center border border-night-600/50">
-                <Camera class="w-5 h-5 text-night-500" />
+          <div class="border-t border-night-700 pt-2">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <span class="text-[10px] text-red-400/80 block mb-1.5 flex items-center gap-1">
+                  <Camera class="w-3 h-3" />
+                  整改前
+                </span>
+                <div
+                  v-if="r.beforePhotos.length > 0"
+                  class="relative group rounded-md overflow-hidden border border-night-600/50 cursor-pointer"
+                  @click="openLightbox(r.beforePhotos[0], '整改前')"
+                >
+                  <img
+                    :src="r.beforePhotos[0]"
+                    alt="整改前"
+                    class="w-full h-24 object-cover"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <ZoomIn class="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+                <div v-else class="bg-night-700/50 rounded-md h-24 flex items-center justify-center border border-night-600/50">
+                  <ImageIcon class="w-5 h-5 text-night-500" />
+                </div>
               </div>
-            </div>
-            <div>
-              <span class="text-[10px] text-night-500 block mb-1">整改后</span>
-              <div
-                v-if="r.afterPhotos.length > 0 || r.status === 'completed'"
-                class="bg-emerald-500/5 rounded-md h-20 flex items-center justify-center border border-emerald-500/20"
-              >
-                <Camera class="w-5 h-5 text-emerald-500/50" />
-              </div>
-              <div v-else class="bg-night-700/50 rounded-md h-20 flex items-center justify-center border border-night-600/50">
-                <span class="text-[10px] text-night-500">待上传</span>
+              <div>
+                <span class="text-[10px] text-emerald-400/80 block mb-1.5 flex items-center gap-1">
+                  <Camera class="w-3 h-3" />
+                  整改后
+                </span>
+                <div
+                  v-if="r.afterPhotos.length > 0"
+                  class="relative group rounded-md overflow-hidden border border-emerald-500/30 cursor-pointer"
+                  @click="openLightbox(r.afterPhotos[0], '整改后')"
+                >
+                  <img
+                    :src="r.afterPhotos[0]"
+                    alt="整改后"
+                    class="w-full h-24 object-cover"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <ZoomIn class="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+                <div v-else-if="r.status === 'completed'" class="bg-emerald-500/5 rounded-md h-24 flex items-center justify-center border border-emerald-500/20">
+                  <div class="text-center">
+                    <Camera class="w-5 h-5 text-emerald-500/50 mx-auto" />
+                    <span class="text-[9px] text-emerald-500/50 block mt-1">已整改</span>
+                  </div>
+                </div>
+                <div v-else class="bg-night-700/50 rounded-md h-24 flex items-center justify-center border border-night-600/50">
+                  <div class="text-center">
+                    <Camera class="w-5 h-5 text-night-500 mx-auto" />
+                    <span class="text-[9px] text-night-500 block mt-1">待整改</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="flex gap-2 mt-2" v-if="r.status !== 'completed'">
+          <div class="flex gap-2 mt-3" v-if="r.status !== 'completed'">
             <button
               v-if="r.status === 'pending' && store.currentRole === 'inspector'"
               @click="store.updateRectificationStatus(r.id, 'in_progress')"
@@ -281,5 +335,30 @@ watch(selectedStallId, () => {
         <p class="text-xs text-night-600 mt-1">左侧选择有整改记录或巡查数据的摊位</p>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="lightboxUrl"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+        @click.self="closeLightbox"
+      >
+        <div class="relative max-w-3xl max-h-[80vh] mx-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm text-night-300 font-medium">{{ lightboxLabel }}</span>
+            <button
+              @click="closeLightbox"
+              class="p-1.5 rounded-full bg-night-700 hover:bg-night-600 text-night-300 transition-colors"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+          <img
+            :src="lightboxUrl"
+            :alt="lightboxLabel"
+            class="max-w-full max-h-[70vh] rounded-lg border border-night-600 shadow-2xl"
+          />
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

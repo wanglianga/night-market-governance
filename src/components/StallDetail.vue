@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Shuffle,
   Volume2,
+  Mic,
 } from 'lucide-vue-next'
 import type { LicenseStatus, GasCylinderStatus } from '@/types'
 
@@ -163,9 +164,10 @@ function rectStatusBadge(status: string) {
             <p class="text-[11px] text-night-300 leading-relaxed">{{ c.content }}</p>
             <div class="flex items-center justify-between mt-1.5">
               <span class="text-[10px] text-night-500">{{ c.createdAt }}</span>
-              <div v-if="c.recordingUrl" class="flex items-center gap-0.5 text-[10px] text-blue-400">
-                <Volume2 class="w-3 h-3" />
-                录音
+              <div v-if="c.recordingUrl" class="flex items-center gap-1 text-[10px] text-blue-400">
+                <Mic class="w-3 h-3" />
+                录音 {{ Math.floor(c.recordingDuration / 60) }}:{{ String(c.recordingDuration % 60).padStart(2, '0') }}
+                <span v-if="c.recordingCaller" class="text-night-500">· {{ c.recordingCaller }}</span>
               </div>
             </div>
           </div>

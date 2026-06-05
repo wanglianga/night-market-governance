@@ -22,10 +22,39 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
   const selectedStallId = ref<string | null>(null)
   const selectedComplaintId = ref<string | null>(null)
 
+  const DATA_VERSION = 2
+
   const stalls = ref<Stall[]>([...seedStalls])
   const complaints = ref<Complaint[]>([...seedComplaints])
   const inspections = ref<Inspection[]>([...seedInspections])
   const rectifications = ref<Rectification[]>([...seedRectifications])
+
+  function migrateData() {
+    const stored = localStorage.getItem('nightMarket')
+    if (!stored) return
+    try {
+      const parsed = JSON.parse(stored)
+      if (parsed._v === DATA_VERSION) return
+      if (parsed.complaints) {
+        for (const c of parsed.complaints) {
+          if (c.recordingDuration === undefined) c.recordingDuration = 0
+          if (c.recordingCaller === undefined) c.recordingCaller = ''
+        }
+      }
+      if (parsed.rectifications) {
+        for (const r of parsed.rectifications) {
+          if (!r.beforePhotos) r.beforePhotos = []
+          if (!r.afterPhotos) r.afterPhotos = []
+        }
+      }
+      parsed._v = DATA_VERSION
+      localStorage.setItem('nightMarket', JSON.stringify(parsed))
+    } catch {
+      localStorage.removeItem('nightMarket')
+    }
+  }
+
+  migrateData()
 
   const statLicenseComplete = computed(
     () => stalls.value.filter((s) => s.licenseStatus === 'complete').length,

@@ -24,6 +24,8 @@ export interface Complaint {
   stallId: string
   content: string
   recordingUrl: string
+  recordingDuration: number
+  recordingCaller: string
   status: ComplaintStatus
   repeatCount: number
   createdAt: string
