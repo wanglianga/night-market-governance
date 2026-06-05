@@ -4,6 +4,8 @@ export type AuditStatus = 'pending' | 'approved' | 'rejected'
 export type RectificationStatus = 'pending' | 'in_progress' | 'completed'
 export type ComplaintStatus = 'pending' | 'processing' | 'resolved'
 export type RoadOccupationLevel = 'none' | 'slight' | 'moderate' | 'severe'
+export type ComplaintCategory = 'noise' | 'oil_fume' | 'road_occupation' | 'other'
+export type ComplaintRepeatType = 'single_resident_continuous' | 'multiple_residents_concentrated' | 'recurrence_after_rectification' | 'none'
 
 export interface Stall {
   id: string
@@ -22,12 +24,23 @@ export interface Stall {
 export interface Complaint {
   id: string
   stallId: string
+  category: ComplaintCategory
   content: string
+  summary: string
   recordingUrl: string
   recordingDuration: number
   recordingCaller: string
+  callerPhone: string
   status: ComplaintStatus
   repeatCount: number
+  repeatType: ComplaintRepeatType
+  assignedInspector: string
+  assignedAt: string
+  reviewedAt: string
+  residentApproved: boolean | null
+  photos: string[]
+  processingNotes: string
+  followUpResult: string
   createdAt: string
   resolvedAt: string
 }
@@ -55,7 +68,7 @@ export interface Rectification {
 
 export type UserRole = 'street_staff' | 'inspector'
 
-export type WorkTab = 'stalls' | 'complaints' | 'inspection' | 'rectification' | 'lottery'
+export type WorkTab = 'stalls' | 'complaints' | 'inspection' | 'rectification' | 'lottery' | 'timeline'
 
 export type ExcludeReason =
   | 'license_expired'

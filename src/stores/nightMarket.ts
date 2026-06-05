@@ -37,7 +37,7 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
   const selectedStallId = ref<string | null>(null)
   const selectedComplaintId = ref<string | null>(null)
 
-  const DATA_VERSION = 4
+  const DATA_VERSION = 5
 
   const stalls = ref<Stall[]>([...seedStalls])
   const complaints = ref<Complaint[]>([...seedComplaints])
@@ -69,9 +69,31 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
             if (!c.recordingUrl && seed.recordingUrl) c.recordingUrl = seed.recordingUrl
             if (c.recordingDuration === undefined) c.recordingDuration = seed.recordingDuration
             if (c.recordingCaller === undefined) c.recordingCaller = seed.recordingCaller
+            if (c.category === undefined) c.category = seed.category || 'other'
+            if (c.summary === undefined) c.summary = seed.summary || ''
+            if (c.callerPhone === undefined) c.callerPhone = seed.callerPhone || ''
+            if (c.repeatType === undefined) c.repeatType = seed.repeatType || 'none'
+            if (c.assignedInspector === undefined) c.assignedInspector = seed.assignedInspector || ''
+            if (c.assignedAt === undefined) c.assignedAt = seed.assignedAt || ''
+            if (c.reviewedAt === undefined) c.reviewedAt = seed.reviewedAt || ''
+            if (c.residentApproved === undefined) c.residentApproved = seed.residentApproved || null
+            if (c.photos === undefined) c.photos = seed.photos || []
+            if (c.processingNotes === undefined) c.processingNotes = seed.processingNotes || ''
+            if (c.followUpResult === undefined) c.followUpResult = seed.followUpResult || ''
           } else {
             if (c.recordingDuration === undefined) c.recordingDuration = 0
             if (c.recordingCaller === undefined) c.recordingCaller = ''
+            if (c.category === undefined) c.category = 'other'
+            if (c.summary === undefined) c.summary = ''
+            if (c.callerPhone === undefined) c.callerPhone = ''
+            if (c.repeatType === undefined) c.repeatType = 'none'
+            if (c.assignedInspector === undefined) c.assignedInspector = ''
+            if (c.assignedAt === undefined) c.assignedAt = ''
+            if (c.reviewedAt === undefined) c.reviewedAt = ''
+            if (c.residentApproved === undefined) c.residentApproved = null
+            if (c.photos === undefined) c.photos = []
+            if (c.processingNotes === undefined) c.processingNotes = ''
+            if (c.followUpResult === undefined) c.followUpResult = ''
           }
         }
       }

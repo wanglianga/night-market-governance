@@ -5,6 +5,7 @@ import StatBar from '@/components/StatBar.vue'
 import StallList from '@/components/StallList.vue'
 import StallDetail from '@/components/StallDetail.vue'
 import ComplaintDetail from '@/components/ComplaintDetail.vue'
+import ComplaintTimeline from '@/components/ComplaintTimeline.vue'
 import InspectionInput from '@/components/InspectionInput.vue'
 import RectificationCompare from '@/components/RectificationCompare.vue'
 import LotteryDraw from '@/components/LotteryDraw.vue'
@@ -15,6 +16,7 @@ import {
   ArrowLeftRight,
   Moon,
   Shuffle,
+  Clock,
 } from 'lucide-vue-next'
 import type { WorkTab } from '@/types'
 
@@ -28,6 +30,7 @@ const tabs: { key: WorkTab; label: string; icon: any }[] = [
   { key: 'stalls', label: '摊位列表', icon: Store },
   { key: 'lottery', label: '摊位抽签', icon: Shuffle },
   { key: 'complaints', label: '投诉详情', icon: MessageSquare },
+  { key: 'timeline', label: '投诉时间线', icon: Clock },
   { key: 'inspection', label: '巡查录入', icon: ClipboardCheck },
   { key: 'rectification', label: '整改对比', icon: ArrowLeftRight },
 ]
@@ -98,6 +101,7 @@ const tabs: { key: WorkTab; label: string; icon: any }[] = [
           <StallList v-if="store.activeTab === 'stalls'" />
           <LotteryDraw v-else-if="store.activeTab === 'lottery'" class="h-full p-3" />
           <ComplaintDetail v-else-if="store.activeTab === 'complaints'" />
+          <ComplaintTimeline v-else-if="store.activeTab === 'timeline'" />
           <InspectionInput v-else-if="store.activeTab === 'inspection'" />
           <RectificationCompare v-else-if="store.activeTab === 'rectification'" />
         </div>
