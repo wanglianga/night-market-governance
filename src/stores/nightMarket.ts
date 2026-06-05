@@ -13,8 +13,23 @@ import type {
   ComplaintStatus,
   RectificationStatus,
   RoadOccupationLevel,
+  LotteryApplicant,
+  LotteryResult,
+  StallPositionInfo,
+  AssignedStall,
+  ExcludeReason,
+  Appeal,
+  LotteryAdjustment,
 } from '@/types'
-import { seedStalls, seedComplaints, seedInspections, seedRectifications } from '@/data/seed'
+import {
+  seedStalls,
+  seedComplaints,
+  seedInspections,
+  seedRectifications,
+  seedLotteryApplicants,
+  seedStallPositions,
+  EXCLUDE_REASON_LABELS,
+} from '@/data/seed'
 
 export const useNightMarketStore = defineStore('nightMarket', () => {
   const currentRole = ref<UserRole>('street_staff')
@@ -22,12 +37,16 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
   const selectedStallId = ref<string | null>(null)
   const selectedComplaintId = ref<string | null>(null)
 
-  const DATA_VERSION = 3
+  const DATA_VERSION = 4
 
   const stalls = ref<Stall[]>([...seedStalls])
   const complaints = ref<Complaint[]>([...seedComplaints])
   const inspections = ref<Inspection[]>([...seedInspections])
   const rectifications = ref<Rectification[]>([...seedRectifications])
+  const lotteryApplicants = ref<LotteryApplicant[]>([...seedLotteryApplicants])
+  const stallPositions = ref<StallPositionInfo[]>([...seedStallPositions])
+  const lotteryResult = ref<LotteryResult | null>(null)
+  const appeals = ref<Appeal[]>([])
 
   function migrateData() {
     const stored = localStorage.getItem('nightMarket')
@@ -257,6 +276,233 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
     localStorage.setItem('nightMarket', JSON.stringify(oldData))
   }
 
+  const HIGH_FUME_CATEGORIES = ['烧烤', '炸串', '铁板烧', '烤鱼', '麻辣烫']
+  const MAX_VIOLATIONS = 2
+
+  const availablePositions = computed(() =>
+    stallPositions.value.filter((p) => !p.occupied),
+  )
+
+  const pendingAppeals = computed(() =>
+    appeals.value.filter((a) => a.status === 'pending'),
+  )
+
+  const excludeReasonLabels = EXCLUDE_REASON_LABELS
+
+  function shuffleArray<T>(array: T[]): T[] {
+    const result = [...array]
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[result[i], result[j]] = [result[j], result[i]]
+    }
+    return result
+  }
+
+  function checkEligibility(applicant: LotteryApplicant): {
+    eligible: boolean
+    reason?: ExcludeReason
+  } {
+    if (applicant.licenseStatus === 'expired') {
+      return { eligible: false, reason: 'license_expired' }
+    }
+    if (applicant.licenseStatus === 'incomplete') {
+      return { eligible: false, reason: 'license_incomplete' }
+    }
+    if (applicant.gasCylinderStatus === 'danger') {
+      return { eligible: false, reason: 'gas_danger' }
+    }
+    if (applicant.violationCount > MAX_VIOLATIONS) {
+      return { eligible: false, reason: 'violation_exceeded' }
+    }
+    if (
+      applicant.isHighFumeCategory &&
+      applicant.nearResidentialArea
+    ) {
+      return { eligible: false, reason: 'high_fume_sensitive_area' }
+    }
+    return { eligible: true }
+  }
+
+  function getAdjacentPositions(position: StallPositionInfo): StallPositionInfo[] {
+    const adjacent: StallPositionInfo[] = []
+    const { row, col } = position
+    const directions = [
+      { dr: 0, dc: -1 },
+      { dr: 0, dc: 1 },
+    ]
+    for (const dir of directions) {
+      const adj = stallPositions.value.find(
+        (p) => p.row === row && p.col === col + dir.dc,
+      )
+      if (adj) adjacent.push(adj)
+    }
+    return adjacent
+  }
+
+  function isHighFumeCategory(category: string): boolean {
+    return HIGH_FUME_CATEGORIES.includes(category)
+  }
+
+  function performLottery(drawnBy: string = '街道工作人员'): LotteryResult {
+    const excluded: { applicant: LotteryApplicant; reason: ExcludeReason }[] = []
+    const eligible: LotteryApplicant[] = []
+
+    for (const applicant of lotteryApplicants.value) {
+      const check = checkEligibility(applicant)
+      if (check.eligible) {
+        eligible.push(applicant)
+      } else if (check.reason) {
+        excluded.push({ applicant, reason: check.reason })
+      }
+    }
+
+    const shuffled = shuffleArray(eligible)
+    const positions = [...stallPositions.value].map((p) => ({ ...p, occupied: false }))
+    const selected: AssignedStall[] = []
+    const waitlist: LotteryApplicant[] = []
+    const adjustments: LotteryAdjustment[] = []
+
+    for (const applicant of shuffled) {
+      let assignedPos: StallPositionInfo | undefined
+
+      if (isHighFumeCategory(applicant.category)) {
+        assignedPos = positions.find((p) => !p.occupied && !p.nearResidential)
+        if (!assignedPos) {
+          assignedPos = positions.find((p) => !p.occupied)
+        }
+      } else {
+        assignedPos = positions.find((p) => !p.occupied)
+      }
+
+      if (assignedPos) {
+        assignedPos.occupied = true
+        assignedPos.category = applicant.category
+
+        selected.push({
+          applicantId: applicant.id,
+          position: assignedPos.position,
+          row: assignedPos.row,
+          col: assignedPos.col,
+          nearResidential: assignedPos.nearResidential,
+        })
+      } else {
+        waitlist.push(applicant)
+      }
+    }
+
+    for (const assigned of selected) {
+      const pos = positions.find((p) => p.position === assigned.position)
+      if (!pos || !pos.category) continue
+
+      if (isHighFumeCategory(pos.category) && pos.nearResidential) {
+        const adjPositions = getAdjacentPositions(pos)
+        const highFumeNeighbors = adjPositions.filter(
+          (p) => p.category && isHighFumeCategory(p.category),
+        )
+
+        if (highFumeNeighbors.length >= 1) {
+          const nonResidentialPos = positions.find(
+            (p) => !p.occupied && !p.nearResidential,
+          )
+          if (nonResidentialPos) {
+            nonResidentialPos.occupied = true
+            nonResidentialPos.category = pos.category
+            pos.occupied = false
+            pos.category = undefined
+
+            const oldPos = assigned.position
+            assigned.position = nonResidentialPos.position
+            assigned.row = nonResidentialPos.row
+            assigned.col = nonResidentialPos.col
+            assigned.nearResidential = nonResidentialPos.nearResidential
+
+            adjustments.push({
+              id: `ADJ${adjustments.length + 1}`,
+              applicantId: assigned.applicantId,
+              fromPosition: oldPos,
+              toPosition: assigned.position,
+              reason: '高油烟摊位集中于居民楼一侧，调整至非敏感区域',
+              staffName: drawnBy,
+              adjustedAt: new Date().toLocaleString('zh-CN'),
+            })
+          }
+        }
+      }
+    }
+
+    const result: LotteryResult = {
+      id: `LOT${Date.now()}`,
+      drawAt: new Date().toLocaleString('zh-CN'),
+      drawnBy,
+      selected,
+      waitlist,
+      excluded,
+      adjustments,
+    }
+
+    lotteryResult.value = result
+
+    for (const assigned of selected) {
+      const pos = stallPositions.value.find((p) => p.position === assigned.position)
+      if (pos) {
+        pos.occupied = true
+        const applicant = lotteryApplicants.value.find((a) => a.id === assigned.applicantId)
+        pos.category = applicant?.category
+      }
+    }
+
+    return result
+  }
+
+  function resetLottery() {
+    lotteryResult.value = null
+    for (const pos of stallPositions.value) {
+      pos.occupied = false
+      pos.category = undefined
+    }
+  }
+
+  function submitAppeal(data: {
+    applicantId: string
+    applicantName: string
+    reason: string
+    description: string
+  }) {
+    appeals.value.push({
+      id: `APL${appeals.value.length + 1}`,
+      ...data,
+      status: 'pending',
+      submittedAt: new Date().toLocaleString('zh-CN'),
+    })
+  }
+
+  function reviewAppeal(
+    appealId: string,
+    status: 'approved' | 'rejected',
+    reviewNote: string,
+    reviewer: string = '街道工作人员',
+  ) {
+    const appeal = appeals.value.find((a) => a.id === appealId)
+    if (appeal) {
+      appeal.status = status
+      appeal.reviewNote = reviewNote
+      appeal.reviewer = reviewer
+      appeal.reviewedAt = new Date().toLocaleString('zh-CN')
+    }
+  }
+
+  function getApplicantById(id: string): LotteryApplicant | undefined {
+    return lotteryApplicants.value.find((a) => a.id === id)
+  }
+
+  function getSelectedApplicants(): { applicant: LotteryApplicant; position: string }[] {
+    if (!lotteryResult.value) return []
+    return lotteryResult.value.selected.map((s) => ({
+      applicant: lotteryApplicants.value.find((a) => a.id === s.applicantId)!,
+      position: s.position,
+    }))
+  }
+
   return {
     currentRole,
     activeTab,
@@ -266,6 +512,10 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
     complaints,
     inspections,
     rectifications,
+    lotteryApplicants,
+    stallPositions,
+    lotteryResult,
+    appeals,
     statLicenseComplete,
     statPendingAudit,
     statRectifying,
@@ -276,6 +526,9 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
     stallInspections,
     stallRectifications,
     stallRepeatComplaints,
+    availablePositions,
+    pendingAppeals,
+    excludeReasonLabels,
     setRole,
     setActiveTab,
     selectStall,
@@ -289,6 +542,12 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
     updateStallGasCylinder,
     resetAllData,
     injectOldTestData,
+    performLottery,
+    resetLottery,
+    submitAppeal,
+    reviewAppeal,
+    getApplicantById,
+    getSelectedApplicants,
   }
 }, {
   persist: true,

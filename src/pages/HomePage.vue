@@ -7,19 +7,26 @@ import StallDetail from '@/components/StallDetail.vue'
 import ComplaintDetail from '@/components/ComplaintDetail.vue'
 import InspectionInput from '@/components/InspectionInput.vue'
 import RectificationCompare from '@/components/RectificationCompare.vue'
+import LotteryDraw from '@/components/LotteryDraw.vue'
 import {
   Store,
   MessageSquare,
   ClipboardCheck,
   ArrowLeftRight,
   Moon,
+  Shuffle,
 } from 'lucide-vue-next'
 import type { WorkTab } from '@/types'
 
 const store = useNightMarketStore()
 
+function reloadPage() {
+  window.location.reload()
+}
+
 const tabs: { key: WorkTab; label: string; icon: any }[] = [
   { key: 'stalls', label: '摊位列表', icon: Store },
+  { key: 'lottery', label: '摊位抽签', icon: Shuffle },
   { key: 'complaints', label: '投诉详情', icon: MessageSquare },
   { key: 'inspection', label: '巡查录入', icon: ClipboardCheck },
   { key: 'rectification', label: '整改对比', icon: ArrowLeftRight },
@@ -42,14 +49,14 @@ const tabs: { key: WorkTab; label: string; icon: any }[] = [
         <RoleSwitch />
         <div class="flex items-center gap-1 ml-2">
           <button
-            @click="store.resetAllData(); location.reload()"
+            @click="store.resetAllData(); reloadPage()"
             class="px-2 py-1 rounded text-[10px] text-night-500 hover:text-night-300 hover:bg-night-700 transition-colors"
             title="清除本地数据并重载"
           >
             重置数据
           </button>
           <button
-            @click="store.injectOldTestData(); location.reload()"
+            @click="store.injectOldTestData(); reloadPage()"
             class="px-2 py-1 rounded text-[10px] text-night-500 hover:text-amber-400 hover:bg-night-700 transition-colors"
             title="注入旧版数据（无录音无照片）后重载，模拟升级"
           >
@@ -85,10 +92,11 @@ const tabs: { key: WorkTab; label: string; icon: any }[] = [
         <div
           :class="[
             'flex-1 overflow-hidden',
-            store.activeTab === 'inspection' ? 'overflow-y-auto' : '',
+            store.activeTab === 'inspection' || store.activeTab === 'lottery' ? 'overflow-y-auto' : '',
           ]"
         >
           <StallList v-if="store.activeTab === 'stalls'" />
+          <LotteryDraw v-else-if="store.activeTab === 'lottery'" class="h-full p-3" />
           <ComplaintDetail v-else-if="store.activeTab === 'complaints'" />
           <InspectionInput v-else-if="store.activeTab === 'inspection'" />
           <RectificationCompare v-else-if="store.activeTab === 'rectification'" />
