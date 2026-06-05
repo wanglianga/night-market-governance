@@ -22,7 +22,7 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
   const selectedStallId = ref<string | null>(null)
   const selectedComplaintId = ref<string | null>(null)
 
-  const DATA_VERSION = 2
+  const DATA_VERSION = 3
 
   const stalls = ref<Stall[]>([...seedStalls])
   const complaints = ref<Complaint[]>([...seedComplaints])
@@ -35,18 +35,45 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
     try {
       const parsed = JSON.parse(stored)
       if (parsed._v === DATA_VERSION) return
+
+      const seedComplaintMap = new Map<string, Complaint>(
+        seedComplaints.map((c) => [c.id, c]),
+      )
+      const seedRectMap = new Map<string, Rectification>(
+        seedRectifications.map((r) => [r.id, r]),
+      )
+
       if (parsed.complaints) {
         for (const c of parsed.complaints) {
-          if (c.recordingDuration === undefined) c.recordingDuration = 0
-          if (c.recordingCaller === undefined) c.recordingCaller = ''
+          const seed = seedComplaintMap.get(c.id)
+          if (seed) {
+            if (!c.recordingUrl && seed.recordingUrl) c.recordingUrl = seed.recordingUrl
+            if (c.recordingDuration === undefined) c.recordingDuration = seed.recordingDuration
+            if (c.recordingCaller === undefined) c.recordingCaller = seed.recordingCaller
+          } else {
+            if (c.recordingDuration === undefined) c.recordingDuration = 0
+            if (c.recordingCaller === undefined) c.recordingCaller = ''
+          }
         }
       }
+
       if (parsed.rectifications) {
         for (const r of parsed.rectifications) {
-          if (!r.beforePhotos) r.beforePhotos = []
-          if (!r.afterPhotos) r.afterPhotos = []
+          const seed = seedRectMap.get(r.id)
+          if (seed) {
+            if ((!r.beforePhotos || r.beforePhotos.length === 0) && seed.beforePhotos.length > 0) {
+              r.beforePhotos = [...seed.beforePhotos]
+            }
+            if ((!r.afterPhotos || r.afterPhotos.length === 0) && seed.afterPhotos.length > 0) {
+              r.afterPhotos = [...seed.afterPhotos]
+            }
+          } else {
+            if (!r.beforePhotos) r.beforePhotos = []
+            if (!r.afterPhotos) r.afterPhotos = []
+          }
         }
       }
+
       parsed._v = DATA_VERSION
       localStorage.setItem('nightMarket', JSON.stringify(parsed))
     } catch {
@@ -178,6 +205,58 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
     if (stall) stall.gasCylinderStatus = status
   }
 
+  function resetAllData() {
+    stalls.value = [...seedStalls]
+    complaints.value = [...seedComplaints]
+    inspections.value = [...seedInspections]
+    rectifications.value = [...seedRectifications]
+    currentRole.value = 'street_staff'
+    activeTab.value = 'stalls'
+    selectedStallId.value = null
+    selectedComplaintId.value = null
+    localStorage.removeItem('nightMarket')
+  }
+
+  function injectOldTestData() {
+    const oldComplaints = seedComplaints.map((c) => ({
+      id: c.id,
+      stallId: c.stallId,
+      content: c.content,
+      recordingUrl: '',
+      status: c.status,
+      repeatCount: c.repeatCount,
+      createdAt: c.createdAt,
+      resolvedAt: c.resolvedAt,
+    }))
+    const oldRectifications = seedRectifications.map((r) => ({
+      id: r.id,
+      stallId: r.stallId,
+      beforePhotos: [] as string[],
+      afterPhotos: [] as string[],
+      status: r.status,
+      description: r.description,
+      createdAt: r.createdAt,
+      completedAt: r.completedAt,
+    }))
+    const oldStalls = seedStalls.map((s) => ({
+      ...s,
+      auditStatus: s.id === 'S002' ? 'approved' as AuditStatus : s.auditStatus,
+      position: s.id === 'S002' ? 'B-11' : s.position,
+    }))
+    const oldData = {
+      currentRole: 'street_staff',
+      activeTab: 'stalls',
+      selectedStallId: null,
+      selectedComplaintId: null,
+      stalls: oldStalls,
+      complaints: oldComplaints,
+      inspections: [...seedInspections],
+      rectifications: oldRectifications,
+      _v: 1,
+    }
+    localStorage.setItem('nightMarket', JSON.stringify(oldData))
+  }
+
   return {
     currentRole,
     activeTab,
@@ -208,6 +287,8 @@ export const useNightMarketStore = defineStore('nightMarket', () => {
     updateRectificationStatus,
     updateStallLicense,
     updateStallGasCylinder,
+    resetAllData,
+    injectOldTestData,
   }
 }, {
   persist: true,

@@ -40,6 +40,22 @@ const tabs: { key: WorkTab; label: string; icon: any }[] = [
           </span>
         </div>
         <RoleSwitch />
+        <div class="flex items-center gap-1 ml-2">
+          <button
+            @click="store.resetAllData(); location.reload()"
+            class="px-2 py-1 rounded text-[10px] text-night-500 hover:text-night-300 hover:bg-night-700 transition-colors"
+            title="清除本地数据并重载"
+          >
+            重置数据
+          </button>
+          <button
+            @click="store.injectOldTestData(); location.reload()"
+            class="px-2 py-1 rounded text-[10px] text-night-500 hover:text-amber-400 hover:bg-night-700 transition-colors"
+            title="注入旧版数据（无录音无照片）后重载，模拟升级"
+          >
+            模拟升级
+          </button>
+        </div>
       </div>
 
       <div class="px-5 pb-2.5">
